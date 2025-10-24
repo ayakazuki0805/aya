@@ -52,6 +52,9 @@ app = Flask(__name__)
 CORS(app)
 app.config['JSON_AS_ASCII'] = False
 
+init_db()
+print("--- データベースの初期化が実行されました ---")
+
 # ▼▼▼ これを追加 ▼▼▼
 # / (ルートURL) にアクセスが来たら checkin.html を表示する
 @app.route('/')
@@ -379,8 +382,6 @@ def admin_logs():
 if __name__ == '__main__':
     # データベース(curfew.db)とテーブルを初期化します
     # (すでに存在する場合は何も起こりません)
-    init_db()
-    print("--- データベースの初期化が完了しました ---")
     
     # サーバーをデバッグモードで起動
     # (debug=True にするとエラーがターミナルに表示されて便利です)
