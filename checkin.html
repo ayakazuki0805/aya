@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>門限チェックシステム</title>
+  <style>
+    body {
+      font-family: "Yu Gothic UI", sans-serif;
+      margin: 2em;
+      background: #f7f7f7;
+      color: #333;
+    }
+    h2 {
+      margin-top: 1.5em;
+    }
+    input, button {
+      padding: 8px;
+      margin: 5px 0;
+      width: 100%;
+      max-width: 300px;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    /* ▼ 管理者ボタン用のスタイルを追加 ▼ */
+    button.admin-button {
+      background-color: #f44336; /* 違う色にする */
+    }
+    button.admin-button:hover {
+      background-color: #d32f2f;
+    }
+    /* ▲ ここまで ▲ */
+    #status {
+      margin-top: 1em;
+      font-weight: bold;
+    }
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+      max-width: 400px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>👤 新規登録</h2>
+    <input id="reg_name" placeholder="名前">
+    <input id="reg_email" placeholder="メールアドレス">
+    <input id="reg_password" type="password" placeholder="パスワード">
+    <button onclick="register()">登録</button>
+
+    <h2>🔑 ログイン</h2>
+    <input id="log_email" placeholder="メールアドレス">
+    <input id="log_password" type="password" placeholder="パスワード">
+    <button onclick="login()">ログイン</button>
+
+    <h2>📍 チェックイン</h2>
+    <button onclick="checkin()">現在地でチェックイン</button>
+    <p id="status"></p>
+
+    <h2>🔒 管理者</h2>
+    <button onclick="viewAdminLogs()" class="admin-button">管理者ログを表示</button>
+    </div>
+
+  <script>
+    const API_BASE = ""; // ← これに変更 (同じサーバーという意味)    
+    const DEVICE_ID_KEY = "device_id";
+    const TOKEN_KEY = "jwt_token";
+
+    // (getDeviceId, register, login, checkin 関数はそのまま)
+    // ...
+    function getDeviceId() {
+      let id = localStorage.getItem(DEVICE_ID_KEY);
+      if (!id) {
+        id = "device-" + Math.random().toString(36).substring(2, 12);
+        localStorage.setItem(DEVICE_ID_KEY, id);
+      }
+      return id;
+    }
+    async function register() {
+      const name = document.getElementById("reg_name").value.trim();
+      const email = document.getElementById("reg_email").value.trim();
+      const password = document.getElementById("reg_password").value;
+      const device_id = getDeviceId();
+      if (!name || !email || !password) {
+        alert("すべて入力してください。");
+        return;
+      }
+      const res = await fetch(`${API_BASE}/register`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name, email, password, device_id})
+      });
+      const data = await res.json();
+      if (res.ok) alert("登録完了！");
+      else alert("登録失敗: " + (data.error || "不明なエラー"));
+    }
+    async function login() {
+      const email = document.getElementById("log_email").value.trim();
+      const password = document.getElementById("log_password").value;
+      const res = await fetch(`${API_BASE}/login`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({email, password})
+      });
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem(TOKEN_KEY, data.token);
+        console.log("DEBUG: [Login] 保存したトークン:", data.token);
+        alert("ログイン成功！");
+      } else {
+        alert("ログイン失敗: " + (data.error || "不明なエラー"));
+      }
+    }
+    async function checkin() {
+      const token = localStorage.getItem(TOKEN_KEY);
+      const device_id = getDeviceId();
+      console.log("DEBUG: [Checkin] 送信するトークン:", token);
+      console.log("DEBUG: [Checkin] 送信するDeviceID:", device_id);
+      if (!token) {
+        alert("ログインしてください。");
+        return;
+      }
+      document.getElementById("status").innerText = "位置情報取得中...";
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        const res = await fetch(`${API_BASE}/checkin`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + token,
+            "X-Device-ID": device_id
+          },
+          body: JSON.stringify({latitude: lat, longitude: lon})
+        });
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById("status").innerText =
+            `✅ ${data.user} さんの結果: ${data.status}\n距離: ${data.distance_km}km\n(${data.server_time})`;
+        } else {
+          document.getElementById("status").innerText = `❌ エラー: ${data.error}`;
+        }
+      }, (err) => {
+        document.getElementById("status").innerText = "位置情報が取得できません: " + err.message;
+      });
+    }
+    // ...
+
+    // ▼▼▼ 管理者ログを表示する関数を新しく追加 ▼▼▼
+    async function viewAdminLogs() {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) {
+        alert("管理者としてログインしてください。");
+        return;
+      }
+
+      // トークンをヘッダーに含めて /admin_logs にリクエスト
+      const res = await fetch(`${API_BASE}/admin_logs`, {
+        method: "GET",
+        headers: {
+          "Authorization": "Bearer " + token
+        }
+      });
+
+      if (res.ok) {
+        // 成功した場合 (HTMLが返ってくる)
+        const html = await res.text();
+        // 新しいタブを開いて、そのタブにHTMLを書き込む
+        const logWindow = window.open("", "_blank");
+        logWindow.document.write(html);
+        logWindow.document.close();
+      } else {
+        // 失敗した場合 (401: 認証エラー, 403: 権限エラーなど)
+        const errorMessage = await res.text(); // "認証エラー" などのテキスト
+        alert("ログ取得失敗: " + errorMessage);
+      }
+    }
+    // ▲▲▲ ここまで ▲▲▲
+  </script>
+</body>
+</html>
