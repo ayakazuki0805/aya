@@ -17,7 +17,8 @@
 - SECRET_KEY は安全に保管してください（環境変数推奨）。
 """
 
-from flask import Flask, request, jsonify, g, send_from_directoryfrom flask_cors import CORS
+from flask import Flask, request, jsonify, g, send_from_directory
+from flask_cors import CORS
 import sqlite3
 from datetime import datetime, timedelta, time, timezone
 import math
