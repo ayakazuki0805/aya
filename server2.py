@@ -52,8 +52,7 @@ app = Flask(__name__)
 CORS(app)
 app.config['JSON_AS_ASCII'] = False
 
-init_db()
-print("--- データベースの初期化が実行されました ---")
+
 
 # ▼▼▼ これを追加 ▼▼▼
 # / (ルートURL) にアクセスが来たら checkin.html を表示する
@@ -169,6 +168,9 @@ def get_user_from_token():
     except (ValueError, TypeError):
         # 変換に失敗したらNone
         return None
+    
+    init_db()
+    print("--- データベースの初期化が実行されました ---")
 
 # ------------------ ルート（認証周り） ------------------
 @app.route('/register', methods=['POST'])
